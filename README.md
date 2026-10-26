@@ -35,3 +35,24 @@ If the spreadsheet or the notebook's logic changes, rebuild `data.json` and uplo
 - Opening `index.html` by double-clicking won't work, because browsers block it from reading `data.json` from a folder. Use the GitHub Pages link, or run `python -m http.server` in the folder and open http://localhost:8000.
 - The repository is public, so `data.json` is public too: bib numbers, times and masked names.
 - The name box is only a label on the card. The page can't check that it matches the bib.
+
+
+## Development & AI Disclosure
+
+This project was vibe-coded with the assistance of generative AI, which was used to develop the Python scripts, data visualisations, and web interface.
+
+### My Contributions
+
+- Extracting the race results from Sporthive.
+- Cleaning and preprocessing the dataset, including handling anomalous finishing times, missing 5KM splits, and DNS/DNF records.
+- Defining the ranking methodology for gun-time and chip-time positions, including tiebreaking rules and category-specific rankings.
+- Reviewing and validating the calculated rankings against the official Sporthive results.
+- Iteratively refining the visualisations, functionality, and presentation of the result cards.
+
+While AI assisted with the implementation, the **data preparation, analytical decisions, validation, and overall project direction were guided by me**.
+
+### Disclaimer
+
+> **This is an independent, unofficial project** and is not affiliated with Garmin, Sporthive, or the race organisers.
+>
+> Rankings are calculated using the cleaned dataset and may differ from the official published results.
