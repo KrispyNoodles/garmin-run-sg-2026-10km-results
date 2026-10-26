@@ -1,4 +1,4 @@
-# Garmin Run Singapore 2026 – 10km result card
+# Garmin Run Singapore 2026 – 21km (Shortened to 10km) result card
 
 A static web page: type a bib number (and optionally a name) and it draws the result card.
 Everything runs in the visitor's browser, so it works on free GitHub Pages.
