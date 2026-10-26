@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Garmin Run Singapore 2026 – 10km result card</title>
+<meta name="description" content="Enter your race bib number to generate your 10km result card.">
+<style>
+  :root {
+    --bg: #f4f8f9; --panel: #ffffff; --text: #17232a; --muted: #5d6b73; --line: #d9e3e7;
+    --teal: #54d3db; --teal-dark: #2a8f97; --error: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #11181c; --panel: #1a2328; --text: #e8eef0; --muted: #9aa8af; --line: #2c3a41; --teal-dark: #54d3db; --error: #ff8a80; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.5;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 28px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 22px; font-size: .95rem; }
+  form {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px; display: grid; gap: 14px; grid-template-columns: 1fr 1fr;
+  }
+  label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 4px; }
+  input[type=text] {
+    width: 100%; font: inherit; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text);
+  }
+  input[type=text]:focus { outline: 2px solid var(--teal); border-color: transparent; }
+  .hint { font-size: .78rem; color: var(--muted); margin-top: 3px; }
+  .actions { grid-column: 1 / -1; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button {
+    font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 10px 18px; cursor: pointer;
+  }
+  #go { background: var(--teal); color: #0b2a2d; }
+  #go:disabled { opacity: .5; cursor: default; }
+  #download { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  #download[hidden] { display: none; }
+  #msg { min-height: 1.4em; margin: 14px 2px 0; font-size: .92rem; }
+  #msg.error { color: var(--error); }
+  #msg.info { color: var(--muted); }
+  #wrap { margin-top: 14px; }
+  canvas { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
+  canvas[hidden] { display: none; }
+  footer { margin-top: 26px; font-size: .78rem; color: var(--muted); }
+  @media (max-width: 520px) { form { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Garmin Run Singapore 2026 – 10km</h1>
+  <p class="sub">Enter your race bib number to see your result card, with your times, positions and splits.</p>
+
+  <form id="form" autocomplete="off">
+    <div>
+      <label for="bib">Race bib number</label>
+      <input id="bib" type="text" inputmode="numeric" placeholder="e.g. 22091" required>
+    </div>
+    <div>
+      <label for="name">Your name <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+      <input id="name" type="text" placeholder="Shown on your card">
+      <div class="hint">Leave blank to show the masked name from the results.</div>
+    </div>
+    <div class="actions">
+      <button id="go" type="submit" disabled>Generate</button>
+      <button id="download" type="button" hidden>Download image</button>
+    </div>
+  </form>
+
+  <div id="msg" class="info" role="status">Loading results…</div>
+  <div id="wrap"><canvas id="card" hidden></canvas></div>
+
+  <footer>
+    Results are unofficial and based on the timing data from the event. Names are masked.
+    Positions are shown by gun time and by chip time; ties are split by the other time.
+  </footer>
+</main>
+
+<script>
+// ---------- settings (same text as the notebook) ----------
+const EVENT_TITLE = "Garmin Run Marathon Series Singapore 2026";
+const EVENT_SUB = "Running @ Singapore, 21KM (shortened to 10km), 25/10/2026, by Krispy Noodles";
+
+const COL = { teal: "#54d3db", tealDark: "#4abcc4", green: "#7fbfa8", orange: "#f5a623",
+              chipBlue: "#2a8f97", blue: "#4169e1", purple: "#800080", gray: "#808080" };
+const FONT = 'Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+const W = 1000, H = 1210, SCALE = 2;      // card size in px, and drawing resolution multiplier
+
+let DATA = null, BY_BIB = new Map(), lastBib = null;
+
+const $ = (id) => document.getElementById(id);
+const canvas = $("card"), ctx = canvas.getContext("2d");
+
+// ---------- load the results ----------
+fetch("data.json")
+  .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then((d) => {
+    DATA = d;
+    d.runners.forEach((r) => BY_BIB.set(r.b, r));
+    setMsg(`Results loaded for ${d.runners.length.toLocaleString()} finishers.`, "info");
+    $("go").disabled = false;
+    const q = new URLSearchParams(location.search);          // optional: ?bib=22091&name=Joey
+    if (q.get("bib")) { $("bib").value = q.get("bib"); $("name").value = q.get("name") || ""; generate(); }
+  })
+  .catch(() => setMsg("Couldn't load the results file (data.json). If you opened this page directly from a folder, " +
+    "view it through the website link instead.", "error"));
+
+function setMsg(text, kind) { const m = $("msg"); m.textContent = text; m.className = kind; }
+
+// ---------- form ----------
+$("form").addEventListener("submit", (e) => { e.preventDefault(); generate(); });
+
+function generate() {
+  if (!DATA) return;
+  const bib = $("bib").value.trim().replace(/^#/, "");
+  if (!bib) { setMsg("Please enter your bib number.", "error"); return; }
+  const r = BY_BIB.get(bib);
+  if (!r) {
+    canvas.hidden = true; $("download").hidden = true;
+    setMsg(`No finisher found for bib ${bib}. Check the number, or you may not have a recorded finish time.`, "error");
+    return;
+  }
+  const name = $("name").value.trim() || r.n;               // masked name if nothing typed
+  drawCard(r, name);
+  lastBib = r.b;
+  canvas.hidden = false; $("download").hidden = false;
+  setMsg("", "info");
+  canvas.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+$("download").addEventListener("click", () => {
+  canvas.toBlob((blob) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `result_bib_${lastBib}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }, "image/png");
+});
+
+// ---------- drawing helpers ----------
+function text(s, x, y, o = {}) {
+  ctx.font = `${o.weight || 400} ${o.size || 17}px ${FONT}`;
+  ctx.fillStyle = o.color || "#000";
+  ctx.textAlign = o.align || "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(s, x, y);
+}
+// shrink text until it fits a maximum width (for long names)
+function fitText(s, x, y, maxW, o) {
+  let size = o.size;
+  ctx.font = `${o.weight || 400} ${size}px ${FONT}`;
+  while (ctx.measureText(s).width > maxW && size > 12) { size -= 1; ctx.font = `${o.weight || 400} ${size}px ${FONT}`; }
+  text(s, x, y, { ...o, size });
+}
+// split a long label into lines of about `n` characters (like textwrap.fill in the notebook)
+function wrap(s, n) {
+  const words = String(s).split(" "), lines = []; let cur = "";
+  for (const w of words) {
+    if ((cur + " " + w).trim().length > n && cur) { lines.push(cur); cur = w; } else cur = (cur + " " + w).trim();
+  }
+  if (cur) lines.push(cur); return lines;
+}
+function line(x1, y1, x2, y2, color, width, alpha = 1) {
+  ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore();
+}
+function niceTicks(lo, hi, target = 7) {
+  const span = hi - lo, raw = span / target, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) || mag * 10;
+  const out = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(6));
+  return { ticks: out, step };
+}
+
+// ---------- the result card ----------
+function drawCard(r, name) {
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
+
+  const genderLabel = r.g === "M" ? "Male" : r.g === "F" ? "Female" : r.g;
+  const category = DATA.categories[r.c];
+  const L = 60, R = 970;                                    // left / right edge of the content
+
+  // ROW 1: header
+  text(EVENT_TITLE, L, 58, { size: 38, weight: 700, color: COL.teal });
+  fitText(EVENT_SUB, L, 94, R - L, { size: 17 });
+  fitText(name, L, 140, R - L, { size: 32, color: COL.teal });
+  text(`Bib #${r.b},  ${genderLabel}`, L, 172, { size: 17 });
+
+  // ROW 2: times panel + splits table
+  const y0 = 195, h2 = 250, split = L + (R - L) * 0.3;
+  ctx.fillStyle = COL.teal; ctx.fillRect(L, y0, split - L, h2);
+  ctx.fillStyle = COL.tealDark; ctx.fillRect(split, y0, R - split, h2);
+  const cx = (L + split) / 2;
+  text("GUN TIME", cx, y0 + 38, { size: 20, color: "#fff", align: "center" });
+  text(r.gun, cx, y0 + 100, { size: 56, color: "#fff", align: "center" });
+  [["Chip time", r.chip], ["Speed", `${r.sp} km/h`], ["Pace", `${r.pc} min/km`]].forEach(([lab, val], i) => {
+    const y = y0 + 162 + i * 32;
+    text(lab, cx - 6, y, { size: 17, color: "#fff", align: "right" });
+    text(val, cx + 6, y, { size: 17, color: "#fff", weight: 700 });
+  });
+  const cols = [split + 28, split + 168, split + 322, split + 490];
+  ["NAME", "SPLITS KM", "PACE", "TIME"].forEach((t, i) => text(t, cols[i], y0 + 38, { size: 17, color: "#fff", weight: 700 }));
+  const rows = [["Split 5k", "5 KM", `${r.p5} min/km`, r.k5], ["Finish", "10 KM", `${r.p10} min/km`, r.chip]];
+  rows.forEach((row, i) => {
+    const ly = y0 + 62 + i * 58;
+    line(split + 18, ly, R - 10, ly, "#fff", 1.2, 0.35);
+    row.forEach((v, j) => text(v, cols[j], ly + 30, { size: 17, color: "#fff" }));
+  });
+
+  // ROW 3: positions (gun time and chip time side by side)
+  const y3 = 465, colW = (R - L) / 3;
+  [["Overall position", r.op, r.opc, DATA.total], [genderLabel, r.gp, r.gpc, r.gt], [category, r.cp, r.cpc, r.ct]]
+    .forEach(([label, gunPos, chipPos, total], i) => {
+      const x = L + colW * (i + 0.5);
+      const lines = wrap(label, 30);
+      lines.forEach((ln, k) => text(ln, x, y3 + 22 + k * 22 - (lines.length - 1) * 11 + 11, { size: 17, align: "center" }));
+      [[-72, gunPos, "by gun time", COL.teal], [72, chipPos, "by chip time", COL.chipBlue]].forEach(([dx, pos, cap, color]) => {
+        text(String(pos), x + dx, y3 + 100, { size: 42, weight: 700, color, align: "center" });
+        text(cap, x + dx, y3 + 134, { size: 15, color: COL.gray, align: "center" });
+      });
+      text(`Out of ${total}`, x, y3 + 166, { size: 17, align: "center" });
+    });
+
+  // ROW 4: split chart
+  drawChart(r, name, genderLabel, category, 660, L, R);
+}
+
+function drawChart(r, name, genderLabel, category, top, L, R) {
+  text("SPLIT CHART", L, top + 12, { size: 22 });
+
+  const avg = DATA.averages;
+  const series = [
+    { label: "Overall Average", vals: avg.overall, color: COL.orange, w: 3 },
+    { label: `${genderLabel} Average`, vals: avg.gender[r.g], color: COL.blue, w: 3 },
+    { label: `${genderLabel} ${category} Average`, vals: avg.cat_gender[`${category}|${r.g}`], color: COL.purple, w: 3 },
+    { label: `Runner ${r.b}`, vals: [r.s5, r.s10], color: COL.green, w: 4.5 },
+  ];
+
+  // legend in two columns; the 2nd column starts after the widest label in the 1st (long category names)
+  ctx.font = `400 16px ${FONT}`;
+  const col2 = 50 + Math.max(ctx.measureText(series[0].label).width, ctx.measureText(series[2].label).width) + 40;
+  series.forEach((s, i) => {
+    const lx = L + (i % 2) * col2, ly = top + 52 + Math.floor(i / 2) * 30;
+    line(lx, ly, lx + 38, ly, s.color, s.w); ctx.fillStyle = s.color;
+    ctx.beginPath(); ctx.arc(lx + 19, ly, 5, 0, 7); ctx.fill();
+    text(s.label, lx + 50, ly, { size: 16 });
+  });
+
+  // plot area
+  const px0 = L + 72, px1 = R - 20, py0 = top + 118, py1 = top + 470;
+  const all = series.flatMap((s) => s.vals);
+  let lo = Math.min(...all), hi = Math.max(...all);
+  const pad = (hi - lo) * 0.05 || 1; lo -= pad; hi += pad;
+  const xmin = 4.25, xmax = 10.75;                          // 15% margin around km 5 and 10, as in the notebook
+  const X = (v) => px0 + ((v - xmin) / (xmax - xmin)) * (px1 - px0);
+  const Y = (v) => py1 - ((v - lo) / (hi - lo)) * (py1 - py0);
+
+  // grid + y axis
+  const { ticks, step } = niceTicks(lo, hi);
+  ticks.forEach((t) => {
+    line(px0, Y(t), px1, Y(t), "#000", 1, 0.12);
+    text(step < 1 ? t.toFixed(step < 0.1 ? 2 : 1) : String(t), px0 - 10, Y(t), { size: 15, align: "right" });
+  });
+  [5, 10].forEach((t) => { line(X(t), py0, X(t), py1, "#000", 1, 0.12); text(String(t), X(t), py1 + 22, { size: 15, align: "center" }); });
+  ctx.strokeStyle = "#000"; ctx.lineWidth = 1.2; ctx.strokeRect(px0, py0, px1 - px0, py1 - py0);
+  text("km", (px0 + px1) / 2, py1 + 52, { size: 16, align: "center" });
+  ctx.save(); ctx.translate(L + 4, (py0 + py1) / 2); ctx.rotate(-Math.PI / 2);
+  text("km/h", 0, 0, { size: 16, align: "center" }); ctx.restore();
+
+  // lines (runner drawn last so it sits on top)
+  series.forEach((s) => {
+    line(X(5), Y(s.vals[0]), X(10), Y(s.vals[1]), s.color, s.w);
+    ctx.fillStyle = s.color;
+    [[5, s.vals[0]], [10, s.vals[1]]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(X(x), Y(y), s.w + 2.5, 0, 7); ctx.fill(); });
+  });
+}
+</script>
+</body>
+</html>
