@@ -71,7 +71,11 @@ All rankings start from position 1, with faster finishing times receiving better
 
 ## Development & AI Disclosure
 
-This project was vibe-coded with the assistance of generative AI, which was used to develop the Python scripts, data visualisations, and web interface. My involvement primarily focused on extracting and cleaning the race results, understanding and defining the ranking methodology, and validating the calculated rankings. For the original Jupyter Notebook (data_viz.ipynb), I went through the code line by line to understand how the calculations and visualisations worked. I also manually cross-checked selected gun-time rankings against the official Sporthive results to verify their accuracy. Once I was satisfied with the notebook, I passed it to Claude to develop the web application, including generating data.json and index.html, which form the basis of this repository.
+This project was vibe-coded with the assistance of generative AI, which was used to develop the Python scripts, data visualisations, and web interface. My involvement primarily focused on extracting and cleaning the race results, understanding and defining the ranking methodology, and validating the calculated rankings. For the original Jupyter Notebook (data_viz.ipynb), I went through the code line by line to understand how the calculations and visualisations worked. I also manually cross-checked selected gun-time rankings against the official Sporthive results to verify their accuracy.
+
+My background is primarily in Data Science, Data Analytics, Artificial Intelligence (AI), and Machine Learning (ML), rather than Software Engineering or Web Development. As I have limited experience building websites, I threw into Claude to help turn my analysis into an accessible web application that other runners could use.
+
+Once I was satisfied with the notebook, I passed it to Claude to develop the web application, including generating data.json and index.html, which form the basis of this repository.
 
 While the implementation was largely AI-generated, I was responsible for the data preprocessing, analytical decisions, understanding and reviewing the notebook's logic, and guiding the overall project direction.
 
