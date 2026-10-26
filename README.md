@@ -19,7 +19,7 @@ Everything runs in the visitor's browser, so it works on free GitHub Pages.
 4. Wait a minute or two. The link appears at the top of that page:
    `https://<your-username>.github.io/garmin-run/`
 
-You can also share a pre-filled link: `https://<your-username>.github.io/garmin-run/?bib=22091&name=Joey`
+Try it out here: [link](https://krispynoodles.github.io/garmin-run-sg-2026-10km-results/)
 
 ## Changing the data
 
